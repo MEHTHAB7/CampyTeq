@@ -1,0 +1,97 @@
+name: CampyTeq CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master, "release/*" ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  backend-test:
+    name: Backend Test Suite (Django & Pytest)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: campyteq_test_db
+          POSTGRES_USER: campyteq_user
+          POSTGRES_PASSWORD: campyteq_pass
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Check Database Migrations
+        working-directory: ./backend
+        run: |
+          python manage.py makemigrations --check --dry-run
+
+      - name: Run Pytest Regression Suite
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://campyteq_user:campyteq_pass@localhost:5432/campyteq_test_db
+          REDIS_URL: redis://localhost:6379/1
+          SECRET_KEY: ci-test-secret-key-campyteq-ci-pipeline-key
+          DEBUG: "False"
+        run: |
+          pytest -v
+
+  frontend-build:
+    name: Frontend Build & Typecheck (Next.js 14)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: ./frontend/package.json
+
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run Next.js Production Build
+        working-directory: ./frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+        run: npm run build
+
+  compose-validate:
+    name: Docker Compose Syntax Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose Configs
+        run: |
+          docker compose -f docker-compose.yml config > /dev/null
+          docker compose -f docker-compose.prod.yml config > /dev/null
