@@ -70,13 +70,20 @@ export default function TimetablePage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
             <Calendar className="h-7 w-7 text-indigo-400" />
-            Weekly Academic Timetable
+            {user?.role === "FACULTY" ? "Lab Timetable" : "Weekly Academic Timetable"}
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Scheduled lectures, laboratory practicals, and seminar allocations.
+            {user?.role === "FACULTY"
+              ? "Dedicated laboratory practicals and hands-on sessions allocated to your faculty profile."
+              : "Scheduled lectures, laboratory practicals, and seminar allocations."}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {user?.role === "FACULTY" && (
+            <Badge className="text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+              Lab Faculty Only
+            </Badge>
+          )}
           <Badge variant="outline" className="text-xs border-indigo-500/40 text-indigo-300">
             Batch 2026-2030 • Sem 3
           </Badge>

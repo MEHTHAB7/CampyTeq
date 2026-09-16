@@ -6,12 +6,14 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from common.permissions import IsTenantMember
-from library.models import Book, BookIssue
+from library.models import Book, BookIssue, LibraryRequest
 from library.serializers import (
     BookSerializer,
     BookIssueSerializer,
     BookIssueCreateSerializer,
     BookReturnActionSerializer,
+    LibraryRequestSerializer,
+    LibraryRequestReviewSerializer,
 )
 from communication.models import Notification
 
@@ -44,7 +46,7 @@ class BookIssueViewSet(viewsets.ModelViewSet):
         qs = BookIssue.objects.filter(college=user.college).select_related(
             "book", "user", "student", "issued_by"
         )
-        if user.role in ["LIBRARY_STAFF", "SUPER_ADMIN", "PRINCIPAL"]:
+        if user.role in ["LIBRARY_STAFF", "PRINCIPAL"]:
             return qs
         return qs.filter(user=user)
 
@@ -96,3 +98,92 @@ class BookIssueViewSet(viewsets.ModelViewSet):
         )
         serializer = BookIssueSerializer(qs, many=True)
         return Response(serializer.data)
+
+
+class LibraryRequestViewSet(viewsets.ModelViewSet):
+    """
+    Library Request management:
+    - Mentors can raise requests (borrowing/reservation/procurement).
+    - Library Staff and Principal can view and review incoming requests.
+    - Status updates notify the requesting Mentor.
+    """
+    serializer_class = LibraryRequestSerializer
+    permission_classes = [permissions.IsAuthenticated, IsTenantMember]
+    filterset_fields = ["status", "request_type", "user", "book"]
+    search_fields = ["book__title", "suggested_title", "notes", "user__first_name", "user__last_name"]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = LibraryRequest.objects.filter(college=user.college).select_related(
+            "user", "book", "reviewed_by"
+        )
+        if user.role in ["LIBRARY_STAFF", "PRINCIPAL"]:
+            return qs
+        # Mentors view their own requests
+        return qs.filter(user=user)
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.role not in ["MENTOR", "PRINCIPAL"]:
+            raise permissions.exceptions.PermissionDenied("Only Mentors can submit library requests.")
+        
+        req = serializer.save(
+            college=user.college,
+            user=user,
+            status="PENDING",
+        )
+
+        # Notify Library Staff of incoming request
+        from accounts.models import User as AccountUser
+        staff_users = AccountUser.objects.filter(college=user.college, role="LIBRARY_STAFF")
+        title_name = req.book.title if req.book else req.suggested_title
+        for staff in staff_users:
+            Notification.objects.create(
+                college=user.college,
+                recipient=staff,
+                title=f"New Library Request: {title_name}",
+                message=f"Mentor {user.get_full_name()} submitted a {req.get_request_type_display()} request.",
+                notification_type="SYSTEM",
+                action_url="/dashboard/library",
+            )
+
+    @action(detail=True, methods=["post"])
+    def review(self, request, pk=None):
+        if request.user.role not in ["LIBRARY_STAFF", "PRINCIPAL"]:
+            return Response({
+                "success": False,
+                "message": "Only Library Staff or Principal can review library requests.",
+                "code": "PERMISSION_DENIED"
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        lib_req = self.get_object()
+        serializer = LibraryRequestReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        new_status = serializer.validated_data["status"]
+        remarks = serializer.validated_data.get("reviewer_remarks", "")
+
+        lib_req.status = new_status
+        lib_req.reviewer_remarks = remarks
+        lib_req.reviewed_by = request.user
+        lib_req.reviewed_at = timezone.now()
+        lib_req.save()
+
+        # If fulfilled / issued and copies available, decrement copies
+        if new_status == "FULFILLED" and lib_req.book:
+            if lib_req.book.available_copies > 0:
+                lib_req.book.available_copies -= 1
+                lib_req.book.save(update_fields=["available_copies"])
+
+        # Trigger notification to requesting Mentor
+        title_name = lib_req.book.title if lib_req.book else lib_req.suggested_title
+        Notification.objects.create(
+            college=lib_req.college,
+            recipient=lib_req.user,
+            title=f"Library Request {new_status}: {title_name}",
+            message=f"Your request has been {new_status.lower()} by {request.user.get_full_name()}. {f'Remarks: {remarks}' if remarks else ''}".strip(),
+            notification_type="SYSTEM",
+            action_url="/dashboard/library",
+        )
+
+        return Response(LibraryRequestSerializer(lib_req).data)

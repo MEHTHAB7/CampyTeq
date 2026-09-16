@@ -124,8 +124,16 @@ class TestFinanceWorkflow:
         assert ss.total_deductions == Decimal("10000.00")
         assert ss.net_salary == Decimal("80000.00")
 
-        # 2. Accountant runs monthly payroll for September 2026
+        # 2. Accountant blocked from running payroll (scope strictly fees only)
         self.client.force_authenticate(user=self.accountant)
+        blocked_res = self.client.post("/api/v1/payroll/payslips/generate_monthly/", {
+            "month": 9,
+            "year": 2026,
+        })
+        assert blocked_res.status_code == 403
+
+        # 3. Principal runs monthly payroll for September 2026
+        self.client.force_authenticate(user=self.principal)
         gen_res = self.client.post("/api/v1/payroll/payslips/generate_monthly/", {
             "month": 9,
             "year": 2026,

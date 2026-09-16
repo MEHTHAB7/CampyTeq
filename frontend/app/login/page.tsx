@@ -10,18 +10,15 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/api";
 
 const DEMO_ACCOUNTS = [
-  { role: "Super Admin", email: "superadmin@campyteq.io", note: "Global Multi-Tenant Control", color: "border-purple-500/40 text-purple-300" },
-  { role: "Principal", email: "principal@apex.edu", note: "Apex Tech Executive Dashboard", color: "border-indigo-500/40 text-indigo-300" },
+  { role: "Principal", email: "principal@apex.edu", note: "Apex Tech Executive Dashboard & Full Administration", color: "border-indigo-500/40 text-indigo-300" },
   { role: "Management", email: "management@apex.edu", note: "Financial & Campus Operations", color: "border-blue-500/40 text-blue-300" },
-  { role: "HOD (CS)", email: "hod.cs@apex.edu", note: "Department & Academic Roster", color: "border-cyan-500/40 text-cyan-300" },
-  { role: "Faculty", email: "faculty.priya@apex.edu", note: "Lectures, Attendance, Marks", color: "border-emerald-500/40 text-emerald-300" },
-  { role: "Mentor", email: "mentor.anil@apex.edu", note: "Cohort Monitoring & Alerts", color: "border-teal-500/40 text-teal-300" },
-  { role: "Student", email: "student.rahul@apex.edu", note: "Academic Hub & Schedule", color: "border-amber-500/40 text-amber-300" },
-  { role: "Accountant", email: "accountant.raman@apex.edu", note: "Fees, Invoices, Payroll", color: "border-yellow-500/40 text-yellow-300" },
-  { role: "Security", email: "security.chief@apex.edu", note: "Zone Detection Monitoring", color: "border-red-500/40 text-red-300" },
-  { role: "Print Staff", email: "printstaff.dev@apex.edu", note: "Print Order Fulfillment", color: "border-pink-500/40 text-pink-300" },
-  { role: "Library Staff", email: "librarystaff.anita@apex.edu", note: "Circulation & Books", color: "border-rose-500/40 text-rose-300" },
-  { role: "Metro Student", email: "student.other@metro.edu", note: "Tenant Isolation Test", color: "border-slate-500/40 text-slate-300" },
+  { role: "HOD (CS)", email: "hod.cs@apex.edu", note: "Department Roster & Facility Approvals", color: "border-cyan-500/40 text-cyan-300" },
+  { role: "Lab Faculty", email: "faculty.priya@apex.edu", note: "Lab Timetable, Lab Attendance, Leave", color: "border-emerald-500/40 text-emerald-300" },
+  { role: "Mentor", email: "mentor.anil@apex.edu", note: "Cohort Alerts, Facility & Library Requests", color: "border-teal-500/40 text-teal-300" },
+  { role: "Student", email: "student.rahul@apex.edu", note: "Academic Hub, Attendance & Schedule", color: "border-amber-500/40 text-amber-300" },
+  { role: "Accountant", email: "accountant.raman@apex.edu", note: "Fees, Invoices & Fee Announcements", color: "border-yellow-500/40 text-yellow-300" },
+  { role: "Print Staff", email: "printstaff.dev@apex.edu", note: "Print Order Fulfillment & Chat", color: "border-pink-500/40 text-pink-300" },
+  { role: "Library Staff", email: "librarystaff.anita@apex.edu", note: "Circulation & Mentor Book Requests", color: "border-rose-500/40 text-rose-300" },
 ];
 
 export default function LoginPage() {

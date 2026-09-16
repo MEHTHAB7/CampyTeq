@@ -21,7 +21,7 @@ class SalaryStructureViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role not in ["SUPER_ADMIN", "PRINCIPAL", "ACCOUNTANT"]:
+        if user.role not in ["PRINCIPAL", "MANAGEMENT"]:
             return SalaryStructure.objects.none()
         return SalaryStructure.objects.filter(
             college=user.college
@@ -42,11 +42,11 @@ class PayslipViewSet(viewsets.ModelViewSet):
             college=user.college
         ).select_related("faculty", "faculty__user", "faculty__department")
 
-        if user.role == "FACULTY":
+        if user.role in ["FACULTY", "HOD", "MENTOR"]:
             if hasattr(user, "faculty_profile"):
                 return qs.filter(faculty=user.faculty_profile)
             return Payslip.objects.none()
-        elif user.role not in ["SUPER_ADMIN", "PRINCIPAL", "ACCOUNTANT"]:
+        elif user.role not in ["PRINCIPAL", "MANAGEMENT"]:
             return Payslip.objects.none()
         return qs
 
@@ -57,9 +57,9 @@ class PayslipViewSet(viewsets.ModelViewSet):
     def generate_monthly(self, request):
         """Generates monthly payroll payslips for all active faculty with salary structures."""
         user = request.user
-        if user.role not in ["SUPER_ADMIN", "PRINCIPAL", "ACCOUNTANT"]:
+        if user.role not in ["PRINCIPAL", "MANAGEMENT"]:
             return Response(
-                {"error": "Only accountants and administrative staff can generate payroll"},
+                {"error": "Only institutional administrators can generate payroll"},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -120,7 +120,7 @@ class PayslipViewSet(viewsets.ModelViewSet):
     def mark_paid(self, request, pk=None):
         """Marks a payslip as disbursed with reference number."""
         user = request.user
-        if user.role not in ["SUPER_ADMIN", "PRINCIPAL", "ACCOUNTANT"]:
+        if user.role not in ["PRINCIPAL", "MANAGEMENT"]:
             return Response({"error": "Unauthorized to disburse payroll"}, status=status.HTTP_403_FORBIDDEN)
 
         payslip = self.get_object()

@@ -36,6 +36,8 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
             else:
                 return AttendanceSession.objects.none()
         elif user.role == "FACULTY":
+            # Lab Faculty: strictly restrict to Lab sessions
+            qs = qs.filter(session_type="LAB")
             if hasattr(user, "faculty_profile"):
                 qs = qs.filter(faculty=user.faculty_profile)
         return qs
@@ -50,7 +52,12 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
         faculty = serializer.validated_data.get("faculty")
         if not faculty and hasattr(user, "faculty_profile"):
             faculty = user.faculty_profile
-        serializer.save(college=user.college, faculty=faculty)
+        
+        # Restrict Lab Faculty to creating only LAB sessions
+        if user.role == "FACULTY":
+            serializer.save(college=user.college, faculty=faculty, session_type="LAB")
+        else:
+            serializer.save(college=user.college, faculty=faculty)
 
     @action(detail=True, methods=["get"])
     def roster(self, request, pk=None):

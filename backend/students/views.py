@@ -50,8 +50,10 @@ class StudentViewSet(viewsets.ModelViewSet):
             'user', 'department', 'course', 'batch', 'current_semester', 'mentor__user', 'college'
         )
 
-        # Super Admin access
-        if user.role == 'SUPER_ADMIN':
+        # Principal access
+        if user.role == 'PRINCIPAL':
+            if user.college:
+                return self._apply_filters(qs.filter(college=user.college))
             return self._apply_filters(qs)
 
         # Multi-tenant isolation: strictly scope to user's college
@@ -99,11 +101,11 @@ class StudentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role != 'SUPER_ADMIN':
-            serializer.save(college=user.college)
-        else:
+        if user.role == 'PRINCIPAL':
             college_id = self.request.data.get('college_id') or user.college_id
             serializer.save(college_id=college_id)
+        else:
+            serializer.save(college=user.college)
 
     @action(detail=False, methods=['get'])
     def me(self, request):
@@ -121,17 +123,19 @@ class GuardianViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL':
+            if user.college:
+                return Guardian.objects.filter(college=user.college, is_deleted=False)
             return Guardian.objects.filter(is_deleted=False)
         return Guardian.objects.filter(college=user.college, is_deleted=False)
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role != 'SUPER_ADMIN':
-            serializer.save(college=user.college)
-        else:
+        if user.role == 'PRINCIPAL':
             college_id = self.request.data.get('college_id') or user.college_id
             serializer.save(college_id=college_id)
+        else:
+            serializer.save(college=user.college)
 
 
 class MentorAssignmentViewSet(viewsets.ModelViewSet):
@@ -143,7 +147,9 @@ class MentorAssignmentViewSet(viewsets.ModelViewSet):
         qs = MentorAssignment.objects.filter(is_deleted=False).select_related(
             'mentor__user', 'student__user', 'student__course', 'college'
         )
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL':
+            if user.college:
+                return qs.filter(college=user.college)
             return qs
 
         qs = qs.filter(college=user.college)
@@ -157,8 +163,8 @@ class MentorAssignmentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role != 'SUPER_ADMIN':
-            serializer.save(college=user.college)
-        else:
+        if user.role == 'PRINCIPAL':
             college_id = self.request.data.get('college_id') or user.college_id
             serializer.save(college_id=college_id)
+        else:
+            serializer.save(college=user.college)

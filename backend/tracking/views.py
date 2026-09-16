@@ -20,11 +20,14 @@ from .serializers import (
 
 
 class IsSecurityOrAdmin(permissions.BasePermission):
-    """Allows access only to Super Admin, Principal, or Security Administrator."""
+    """Allows access only to Principal, HOD, or Mentor."""
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
-        return request.user.role in ['SUPER_ADMIN', 'PRINCIPAL', 'SECURITY']
+        return request.user.role in ['PRINCIPAL', 'HOD', 'MENTOR']
+
+
+IsTrackingAuthorized = IsSecurityOrAdmin
 
 
 class IngestDetectionView(APIView):
@@ -40,7 +43,7 @@ class IngestDetectionView(APIView):
         data = serializer.validated_data
 
         user = request.user
-        college = user.college if user.role != 'SUPER_ADMIN' else None
+        college = user.college if not (user.role == 'PRINCIPAL' and not user.college_id) else None
 
         # Resolve camera
         cam_qs = Camera.objects.filter(code=data['camera_code'])
@@ -124,7 +127,7 @@ class DetectionEventViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         user = self.request.user
         qs = DetectionEvent.objects.select_related('camera', 'zone', 'student', 'student__user')
-        if user.role != 'SUPER_ADMIN':
+        if not (user.role == 'PRINCIPAL' and not user.college_id):
             qs = qs.filter(college=user.college)
 
         camera_id = self.request.query_params.get('camera')
@@ -162,7 +165,7 @@ class StudentLastSeenView(APIView):
         user = request.user
 
         # 1. Role authorization check
-        allowed_roles = ['SUPER_ADMIN', 'PRINCIPAL', 'SECURITY', 'MENTOR']
+        allowed_roles = ['PRINCIPAL', 'HOD', 'MENTOR']
         if user.role not in allowed_roles:
             return Response({
                 'success': False,
@@ -189,7 +192,7 @@ class StudentLastSeenView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         student_qs = Student.objects.select_related('user', 'department', 'batch', 'current_semester')
-        if user.role != 'SUPER_ADMIN':
+        if not (user.role == 'PRINCIPAL' and not user.college_id):
             student_qs = student_qs.filter(college=user.college)
 
         # Try UUID lookup then student_number or roll_number
@@ -278,7 +281,7 @@ class TrackingAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         user = self.request.user
         qs = TrackingAccessLog.objects.select_related('user', 'student', 'student__user')
-        if user.role != 'SUPER_ADMIN':
+        if not (user.role == 'PRINCIPAL' and not user.college_id):
             qs = qs.filter(college=user.college)
         return qs[:100]
 
@@ -291,6 +294,6 @@ class BiometricProfileViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         qs = BiometricProfile.objects.select_related('student', 'student__user', 'enrolled_by')
-        if user.role != 'SUPER_ADMIN':
+        if not (user.role == 'PRINCIPAL' and not user.college_id):
             qs = qs.filter(college=user.college)
         return qs

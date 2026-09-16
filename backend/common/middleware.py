@@ -8,7 +8,7 @@ class TenantMiddleware(MiddlewareMixin):
     Ensures that tenant context is strictly derived from the authenticated user
     rather than unauthenticated / client-tampered query params.
 
-    For SUPER_ADMIN users, an optional 'X-College-ID' header is permitted to switch
+    For PRINCIPAL users, an optional 'X-College-ID' header is permitted to switch
     active management context across colleges.
     """
     def process_request(self, request):
@@ -23,8 +23,8 @@ class TenantMiddleware(MiddlewareMixin):
             request.college = user.college
             return
 
-        # If user is SUPER_ADMIN, support tenant context switching via header
-        if getattr(user, 'role', '') == 'SUPER_ADMIN':
+        # For PRINCIPAL users, support tenant context switching via header
+        if getattr(user, 'role', '') == 'PRINCIPAL':
             college_id_header = request.headers.get('X-College-ID')
             if college_id_header:
                 try:

@@ -29,17 +29,19 @@ class ExamViewSet(viewsets.ModelViewSet):
             if student_profile:
                 qs = qs.filter(batch=student_profile.batch)
 
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL':
+            if user.college:
+                return qs.filter(college=user.college)
             return qs
         return qs.filter(college=user.college)
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role != 'SUPER_ADMIN':
-            serializer.save(college=user.college)
-        else:
+        if user.role == 'PRINCIPAL':
             college_id = self.request.data.get('college_id') or user.college_id
             serializer.save(college_id=college_id)
+        else:
+            serializer.save(college=user.college)
 
     @action(detail=True, methods=['post'])
     def publish(self, request, pk=None):
@@ -65,7 +67,9 @@ class ExamSubjectViewSet(viewsets.ModelViewSet):
         if exam_id:
             qs = qs.filter(exam_id=exam_id)
 
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL':
+            if user.college:
+                return qs.filter(exam__college=user.college)
             return qs
         return qs.filter(exam__college=user.college)
 
@@ -116,14 +120,16 @@ class ResultViewSet(viewsets.ModelViewSet):
         if student_id:
             qs = qs.filter(student_id=student_id)
 
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL':
+            if user.college:
+                return qs.filter(college=user.college)
             return qs
         return qs.filter(college=user.college)
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role != 'SUPER_ADMIN':
-            serializer.save(college=user.college, entered_by=user)
-        else:
+        if user.role == 'PRINCIPAL':
             college_id = self.request.data.get('college_id') or user.college_id
             serializer.save(college_id=college_id, entered_by=user)
+        else:
+            serializer.save(college=user.college, entered_by=user)

@@ -68,7 +68,7 @@ export default function PrintShopPage() {
   });
   const [submitting, setSubmitting] = useState(false);
 
-  const isPrintStaff = ["SUPER_ADMIN", "PRINT_STAFF", "PRINCIPAL"].includes(user?.role || "");
+  const isPrintStaff = ["PRINT_STAFF", "PRINCIPAL"].includes(user?.role || "");
 
   const fetchOrders = async () => {
     try {

@@ -26,14 +26,16 @@ class DepartmentViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not user or not user.is_authenticated:
             return Department.objects.none()
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL':
+            if user.college:
+                return Department.objects.filter(college=user.college, is_deleted=False).select_related('hod__user', 'college')
             return Department.objects.filter(is_deleted=False).select_related('hod__user', 'college')
         return Department.objects.filter(college=user.college, is_deleted=False).select_related('hod__user', 'college')
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role != 'SUPER_ADMIN':
-            serializer.save(college=user.college)
-        else:
+        if user.role == 'PRINCIPAL':
             college_id = self.request.data.get('college_id') or user.college_id
             serializer.save(college_id=college_id)
+        else:
+            serializer.save(college=user.college)

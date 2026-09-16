@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'cameras.apps.CamerasConfig',
     'tracking.apps.TrackingConfig',
     'analytics.apps.AnalyticsConfig',
+    'facilities.apps.FacilitiesConfig',
 ]
 
 MIDDLEWARE = [

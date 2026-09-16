@@ -106,12 +106,13 @@ export default function AnnouncementsPage() {
   const pinnedList = filtered.filter((a) => a.is_pinned);
   const regularList = filtered.filter((a) => !a.is_pinned);
 
-  const canPost = ["SUPER_ADMIN", "PRINCIPAL", "HOD", "FACULTY"].includes(user?.role || "");
+  const canPost = ["PRINCIPAL", "HOD", "FACULTY", "ACCOUNTANT"].includes(user?.role || "");
 
   const categoryBadges: Record<string, string> = {
     ACADEMIC: "bg-blue-500/10 text-blue-400 border-blue-500/30",
     EXAM: "bg-amber-500/10 text-amber-400 border-amber-500/30",
     EVENT: "bg-purple-500/10 text-purple-400 border-purple-500/30",
+    FEES: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
     ADMINISTRATIVE: "bg-slate-500/10 text-slate-300 border-slate-500/30",
     HOLIDAY: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
     URGENT: "bg-rose-500/10 text-rose-400 border-rose-500/30",
@@ -133,17 +134,22 @@ export default function AnnouncementsPage() {
             Campus Bulletins & Announcements
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            Official college circulars, examination alerts, academic schedules, and institutional events.
+            Official college circulars, examination alerts, fee notices, academic schedules, and institutional events.
           </p>
         </div>
 
         {canPost && (
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => {
+              if (user?.role === "ACCOUNTANT") {
+                setFormData((prev) => ({ ...prev, category: "FEES" }));
+              }
+              setShowCreateModal(true);
+            }}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md shadow-indigo-600/20 flex items-center gap-2 transition-colors self-start md:self-auto"
           >
             <Plus className="h-4 w-4" />
-            Publish Circular
+            {user?.role === "ACCOUNTANT" ? "Publish Fee Notice" : "Publish Circular"}
           </button>
         )}
       </div>
@@ -151,7 +157,7 @@ export default function AnnouncementsPage() {
       {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-card/60 p-3 rounded-xl border border-border/60">
         <div className="flex flex-wrap gap-1.5 w-full sm:w-auto">
-          {["ALL", "ACADEMIC", "EXAM", "EVENT", "ADMINISTRATIVE", "HOLIDAY", "URGENT"].map((cat) => (
+          {["ALL", "ACADEMIC", "EXAM", "EVENT", "FEES", "ADMINISTRATIVE", "HOLIDAY", "URGENT"].map((cat) => (
             <button
               key={cat}
               onClick={() => setCategoryFilter(cat)}
@@ -323,14 +329,22 @@ export default function AnnouncementsPage() {
                   <select
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
-                    className="w-full bg-secondary/50 border border-border/80 rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    disabled={user?.role === "ACCOUNTANT"}
+                    className="w-full bg-secondary/50 border border-border/80 rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-80"
                   >
-                    <option value="ACADEMIC">Academic</option>
-                    <option value="EXAM">Examination</option>
-                    <option value="EVENT">Campus Event</option>
-                    <option value="ADMINISTRATIVE">Administrative</option>
-                    <option value="HOLIDAY">Holiday Notice</option>
-                    <option value="URGENT">Urgent Notice</option>
+                    {user?.role === "ACCOUNTANT" ? (
+                      <option value="FEES">Fees & Accounts (Locked to Accountant scope)</option>
+                    ) : (
+                      <>
+                        <option value="ACADEMIC">Academic</option>
+                        <option value="EXAM">Examination</option>
+                        <option value="EVENT">Campus Event</option>
+                        <option value="FEES">Fees & Accounts</option>
+                        <option value="ADMINISTRATIVE">Administrative</option>
+                        <option value="HOLIDAY">Holiday Notice</option>
+                        <option value="URGENT">Urgent Notice</option>
+                      </>
+                    )}
                   </select>
                 </div>
 

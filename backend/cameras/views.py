@@ -15,21 +15,19 @@ from .serializers import (
 
 
 class IsCameraViewer(permissions.BasePermission):
-    """Allows camera/zone inspection to authorized personnel."""
+    """Allows camera/zone inspection strictly to Principal, HOD, and Mentor."""
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
-        return request.user.role in [
-            'SUPER_ADMIN', 'PRINCIPAL', 'MANAGEMENT', 'SECURITY', 'MENTOR'
-        ]
+        return request.user.role in ['PRINCIPAL', 'HOD', 'MENTOR']
 
 
 class IsCameraAdmin(permissions.BasePermission):
-    """Allows camera/zone configuration to Security & Admins."""
+    """Allows camera/zone configuration to Principal and HOD."""
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
-        return request.user.role in ['SUPER_ADMIN', 'PRINCIPAL', 'SECURITY']
+        return request.user.role in ['PRINCIPAL', 'HOD']
 
 
 class CameraZoneViewSet(viewsets.ModelViewSet):
@@ -42,7 +40,7 @@ class CameraZoneViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL' and not user.college_id:
             return CameraZone.objects.all().prefetch_related('cameras')
         return CameraZone.objects.filter(college=user.college).prefetch_related('cameras')
 
@@ -68,7 +66,7 @@ class CameraViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         qs = Camera.objects.select_related('zone')
-        if user.role != 'SUPER_ADMIN':
+        if not (user.role == 'PRINCIPAL' and not user.college_id):
             qs = qs.filter(college=user.college)
 
         zone_id = self.request.query_params.get('zone')
@@ -115,8 +113,9 @@ class CameraStatsView(APIView):
         user = request.user
         college = user.college
 
-        cam_qs = Camera.objects.all() if user.role == 'SUPER_ADMIN' else Camera.objects.filter(college=college)
-        zone_qs = CameraZone.objects.all() if user.role == 'SUPER_ADMIN' else CameraZone.objects.filter(college=college)
+        is_cross_tenant_principal = (user.role == 'PRINCIPAL' and not user.college_id)
+        cam_qs = Camera.objects.all() if is_cross_tenant_principal else Camera.objects.filter(college=college)
+        zone_qs = CameraZone.objects.all() if is_cross_tenant_principal else CameraZone.objects.filter(college=college)
 
         total_cameras = cam_qs.count()
         online_cameras = cam_qs.filter(status='ONLINE').count()
@@ -130,7 +129,7 @@ class CameraStatsView(APIView):
         recent_detections = 0
         try:
             from tracking.models import DetectionEvent
-            det_qs = DetectionEvent.objects.all() if user.role == 'SUPER_ADMIN' else DetectionEvent.objects.filter(college=college)
+            det_qs = DetectionEvent.objects.all() if is_cross_tenant_principal else DetectionEvent.objects.filter(college=college)
             since_24h = timezone.now() - timedelta(hours=24)
             recent_detections = det_qs.filter(detected_at__gte=since_24h).count()
         except Exception:

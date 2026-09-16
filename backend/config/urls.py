@@ -36,6 +36,7 @@ urlpatterns = [
     path('api/v1/cameras/', include('cameras.urls')),
     path('api/v1/tracking/', include('tracking.urls')),
     path('api/v1/analytics/', include('analytics.urls')),
+    path('api/v1/facilities/', include('facilities.urls')),
 ]
 
 if settings.DEBUG:

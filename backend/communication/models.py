@@ -11,6 +11,7 @@ class Announcement(TenantModel):
         ADMINISTRATIVE = "ADMINISTRATIVE", "Administrative"
         HOLIDAY = "HOLIDAY", "Holiday Notice"
         URGENT = "URGENT", "Urgent Alert"
+        FEES = "FEES", "Fees & Finance"
 
     class Priority(models.TextChoices):
         NORMAL = "NORMAL", "Normal"
@@ -75,6 +76,9 @@ class Notification(TenantModel):
         EXAM_RESULT = "EXAM_RESULT", "Exam Result"
         LEAVE_STATUS = "LEAVE_STATUS", "Leave Status Update"
         MESSAGE = "MESSAGE", "New Message"
+        PRINT_STATUS = "PRINT_STATUS", "Print Order Status"
+        LIBRARY_STATUS = "LIBRARY_STATUS", "Library Request Status"
+        FACILITY_STATUS = "FACILITY_STATUS", "Facility Booking Status"
 
     recipient = models.ForeignKey(
         "accounts.User",

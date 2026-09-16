@@ -262,7 +262,7 @@ export default function ExamsPage() {
                       <Badge variant="warning" className="text-xs">
                         Confidential (Draft)
                       </Badge>
-                      {["SUPER_ADMIN", "PRINCIPAL", "HOD"].includes(user?.role || "") && (
+                      {["PRINCIPAL", "HOD"].includes(user?.role || "") && (
                         <Button
                           size="sm"
                           variant="gradient"

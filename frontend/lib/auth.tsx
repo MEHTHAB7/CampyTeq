@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { apiRequest } from "./api";
 
 export type UserRole =
-  | "SUPER_ADMIN"
   | "PRINCIPAL"
   | "MANAGEMENT"
   | "HOD"
@@ -14,7 +13,6 @@ export type UserRole =
   | "ACCOUNTANT"
   | "STUDENT"
   | "PARENT"
-  | "SECURITY"
   | "PRINT_STAFF"
   | "LIBRARY_STAFF";
 
@@ -102,7 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const hasPermission = (permissionCode: string) => {
     if (!user) return false;
-    if (user.role === "SUPER_ADMIN") return true;
+    if (user.role === "PRINCIPAL") return true;
     return user.permissions?.includes(permissionCode) || false;
   };
 

@@ -43,7 +43,7 @@ class PrintOrderViewSet(viewsets.ModelViewSet):
         qs = PrintOrder.objects.filter(college=user.college).select_related(
             "user", "handled_by"
         )
-        if user.role in ["PRINT_STAFF", "SUPER_ADMIN", "PRINCIPAL"]:
+        if user.role in ["PRINT_STAFF", "PRINCIPAL"]:
             return qs
         return qs.filter(user=user)
 
@@ -76,6 +76,13 @@ class PrintOrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def update_status(self, request, pk=None):
+        if request.user.role not in ["PRINT_STAFF", "PRINCIPAL"]:
+            return Response({
+                "success": False,
+                "message": "Only Print Staff or Principal can update order statuses.",
+                "code": "PERMISSION_DENIED"
+            }, status=status.HTTP_403_FORBIDDEN)
+
         order = self.get_object()
         serializer = PrintStatusUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -87,16 +94,23 @@ class PrintOrderViewSet(viewsets.ModelViewSet):
         if new_status == PrintOrder.OrderStatus.COMPLETED:
             order.completed_at = timezone.now()
             order.payment_status = PrintOrder.PaymentStatus.PAID
-        elif new_status == PrintOrder.OrderStatus.READY_FOR_PICKUP:
-            # Notify ordering student/faculty
-            Notification.objects.create(
-                college=order.college,
-                recipient=order.user,
-                title=f"Print Order Ready: {order.document_name}",
-                message=f"Order {order.order_number} is ready for collection at the Campus Print Station.",
-                notification_type="SYSTEM",
-                action_url="/dashboard/printshop",
-            )
 
         order.save()
+
+        # Send notification on status update to ordering user
+        status_label = dict(PrintOrder.OrderStatus.choices).get(new_status, new_status)
+        if new_status == PrintOrder.OrderStatus.READY_FOR_PICKUP:
+            notif_title = "Print Order Ready for Pickup"
+        else:
+            notif_title = f"Print Order Status: {status_label}"
+
+        Notification.objects.create(
+            college=order.college,
+            recipient=order.user,
+            title=notif_title,
+            message=f"Order {order.order_number} ({order.document_name}) is now '{status_label}'.",
+            notification_type="SYSTEM",
+            action_url="/dashboard/printshop",
+        )
+
         return Response(PrintOrderSerializer(order).data)

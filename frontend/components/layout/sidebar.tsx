@@ -20,6 +20,7 @@ import {
   Settings,
   LogOut,
   Building2,
+  Building,
   FileSpreadsheet,
   Megaphone,
   CalendarX,
@@ -50,55 +51,61 @@ export function Sidebar() {
       title: "Students",
       href: "/dashboard/students",
       icon: GraduationCap,
-      roles: ["SUPER_ADMIN", "PRINCIPAL", "MANAGEMENT", "HOD", "MENTOR", "FACULTY"],
+      roles: ["PRINCIPAL", "MANAGEMENT", "HOD", "MENTOR"],
     },
     {
       title: "Faculty & Staff",
       href: "/dashboard/faculty",
       icon: Users,
-      roles: ["SUPER_ADMIN", "PRINCIPAL", "MANAGEMENT", "HOD"],
+      roles: ["PRINCIPAL", "MANAGEMENT", "HOD"],
     },
     {
       title: "Academics & Classes",
       href: "/dashboard/academics",
       icon: BookOpen,
-      roles: ["SUPER_ADMIN", "PRINCIPAL", "HOD", "FACULTY", "STUDENT"],
+      roles: ["PRINCIPAL", "HOD", "STUDENT"],
     },
     {
-      title: "Weekly Timetable",
+      title: role === "FACULTY" ? "Lab Timetable" : "Weekly Timetable",
       href: "/dashboard/timetable",
       icon: CalendarCheck,
-      roles: ["ALL"],
+      roles: ["PRINCIPAL", "HOD", "MENTOR", "FACULTY", "STUDENT"],
     },
     {
       title: "Exams & Results",
       href: "/dashboard/exams",
       icon: FileSpreadsheet,
-      roles: ["SUPER_ADMIN", "PRINCIPAL", "HOD", "FACULTY", "STUDENT", "PARENT"],
+      roles: ["PRINCIPAL", "HOD", "STUDENT", "PARENT"],
     },
     {
       title: "Assignments",
       href: "/dashboard/assignments",
       icon: FileText,
-      roles: ["SUPER_ADMIN", "PRINCIPAL", "HOD", "FACULTY", "STUDENT"],
+      roles: ["PRINCIPAL", "HOD", "STUDENT"],
     },
     {
-      title: "Attendance",
+      title: role === "FACULTY" ? "Lab Attendance" : "Attendance",
       href: "/dashboard/attendance",
       icon: CalendarCheck,
-      roles: ["SUPER_ADMIN", "PRINCIPAL", "HOD", "MENTOR", "FACULTY", "STUDENT"],
+      roles: ["PRINCIPAL", "HOD", "MENTOR", "FACULTY", "STUDENT"],
     },
     {
       title: "Fees & Invoices",
       href: "/dashboard/fees",
       icon: CreditCard,
-      roles: ["SUPER_ADMIN", "PRINCIPAL", "ACCOUNTANT", "STUDENT", "PARENT"],
+      roles: ["PRINCIPAL", "MANAGEMENT", "ACCOUNTANT", "STUDENT", "PARENT"],
     },
     {
       title: "Payroll & Salary",
       href: "/dashboard/payroll",
       icon: FileSpreadsheet,
-      roles: ["SUPER_ADMIN", "PRINCIPAL", "ACCOUNTANT", "FACULTY", "HOD", "MENTOR"],
+      roles: ["PRINCIPAL", "MANAGEMENT"],
+    },
+    {
+      title: "Facility Bookings",
+      href: "/dashboard/facilities",
+      icon: Building,
+      roles: ["PRINCIPAL", "HOD", "MENTOR"],
     },
     {
       title: "Announcements",
@@ -122,37 +129,37 @@ export function Sidebar() {
       title: "Documents & Certs",
       href: "/dashboard/documents",
       icon: FileCheck2,
-      roles: ["ALL"],
+      roles: ["PRINCIPAL", "MANAGEMENT", "HOD", "MENTOR", "STUDENT"],
     },
     {
       title: "Campus Print Shop",
       href: "/dashboard/printshop",
       icon: Printer,
-      roles: ["SUPER_ADMIN", "PRINT_STAFF", "STUDENT", "FACULTY"],
+      roles: ["ALL"],
     },
     {
       title: "Library Catalog",
       href: "/dashboard/library",
       icon: Library,
-      roles: ["SUPER_ADMIN", "LIBRARY_STAFF", "STUDENT", "FACULTY"],
+      roles: ["PRINCIPAL", "LIBRARY_STAFF", "MENTOR", "STUDENT"],
     },
     {
       title: "Authorized Cameras",
       href: "/dashboard/cameras",
       icon: Video,
-      roles: ["SUPER_ADMIN", "PRINCIPAL", "SECURITY", "MENTOR"],
+      roles: ["PRINCIPAL", "HOD", "MENTOR"],
     },
     {
       title: "Analytics & AI Radar",
       href: "/dashboard/analytics",
       icon: BarChart3,
-      roles: ["SUPER_ADMIN", "PRINCIPAL", "MANAGEMENT", "HOD", "MENTOR", "STUDENT"],
+      roles: ["PRINCIPAL", "MANAGEMENT", "HOD", "MENTOR"],
     },
     {
       title: "Audit Logs",
       href: "/dashboard/audit",
       icon: ShieldCheck,
-      roles: ["SUPER_ADMIN", "PRINCIPAL"],
+      roles: ["PRINCIPAL"],
     },
   ];
 
@@ -186,7 +193,7 @@ export function Sidebar() {
             <Building2 className="h-4 w-4 text-indigo-400 shrink-0" />
             <div className="min-w-0">
               <p className="text-xs font-medium text-foreground truncate">
-                {user.college?.name || "Global SuperAdmin View"}
+                {user.college?.name || "Campus Administration"}
               </p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 border-indigo-500/40 text-indigo-300">

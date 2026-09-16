@@ -39,18 +39,20 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         if subject_id:
             qs = qs.filter(subject_id=subject_id)
 
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL':
+            if user.college:
+                return qs.filter(college=user.college)
             return qs
         return qs.filter(college=user.college)
 
     def perform_create(self, serializer):
         user = self.request.user
         faculty = getattr(user, 'faculty_profile', None)
-        if user.role != 'SUPER_ADMIN':
-            serializer.save(college=user.college, faculty=faculty)
-        else:
+        if user.role == 'PRINCIPAL':
             college_id = self.request.data.get('college_id') or user.college_id
             serializer.save(college_id=college_id)
+        else:
+            serializer.save(college=user.college, faculty=faculty)
 
 
 class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
@@ -75,7 +77,9 @@ class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
             if faculty:
                 return qs.filter(assignment__faculty=faculty)
 
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL':
+            if user.college:
+                return qs.filter(assignment__college=user.college)
             return qs
         return qs.filter(assignment__college=user.college)
 

@@ -44,14 +44,16 @@ class FacultyViewSet(viewsets.ModelViewSet):
         if status_filter:
             qs = qs.filter(status=status_filter)
 
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL':
+            if user.college:
+                return qs.filter(college=user.college)
             return qs
         return qs.filter(college=user.college)
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role != 'SUPER_ADMIN':
-            serializer.save(college=user.college)
-        else:
+        if user.role == 'PRINCIPAL':
             college_id = self.request.data.get('college_id') or user.college_id
             serializer.save(college_id=college_id)
+        else:
+            serializer.save(college=user.college)

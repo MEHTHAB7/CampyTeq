@@ -55,8 +55,8 @@ class ChangePasswordView(views.APIView):
 class UserViewSet(viewsets.ModelViewSet):
     """
     Tenant-isolated User management.
-    Super Admins can manage all users.
-    Principals/Management can manage users belonging to their college.
+    Principals can manage users belonging to their college (and across colleges if multi-tenant operator).
+    Management can view/manage users belonging to their college.
     """
     serializer_class = UserSerializer
 
@@ -77,10 +77,12 @@ class UserViewSet(viewsets.ModelViewSet):
 
         qs = User.objects.filter(is_deleted=False).select_related('college').prefetch_related('custom_roles')
 
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL':
             college_filter = self.request.query_params.get('college_id')
             if college_filter:
-                qs = qs.filter(college_id=college_filter)
+                return qs.filter(college_id=college_filter)
+            if user.college_id:
+                return qs.filter(college_id=user.college_id)
             return qs
 
         # Tenant isolation: strictly filter to user's college
@@ -88,11 +90,12 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user
-        # Enforce tenant college
-        if user.role != 'SUPER_ADMIN':
-            serializer.save(college=user.college)
+        college = getattr(user, 'college', None)
+        college_id = self.request.data.get('college_id') or getattr(college, 'id', None)
+        if college_id and user.role == 'PRINCIPAL':
+            serializer.save(college_id=college_id)
         else:
-            serializer.save()
+            serializer.save(college=user.college)
 
 
 class RoleViewSet(viewsets.ReadOnlyModelViewSet):
@@ -113,6 +116,6 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL' and not user.college_id:
             return AuditLog.objects.all().select_related('user', 'college')
         return AuditLog.objects.filter(college=user.college).select_related('user', 'college')

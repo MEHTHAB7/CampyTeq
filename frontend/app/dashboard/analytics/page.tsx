@@ -342,7 +342,7 @@ export default function AnalyticsPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          {["SUPER_ADMIN", "PRINCIPAL", "HOD", "MANAGEMENT"].includes(user?.role || "") && (
+          {["PRINCIPAL", "HOD", "MANAGEMENT"].includes(user?.role || "") && (
             <button
               onClick={handleRunEvaluation}
               disabled={evaluating}
@@ -759,7 +759,7 @@ export default function AnalyticsPage() {
                         )}
                       </div>
 
-                      {["SUPER_ADMIN", "PRINCIPAL", "HOD", "MENTOR"].includes(user?.role || "") && (
+                      {["PRINCIPAL", "HOD", "MENTOR"].includes(user?.role || "") && (
                         <button
                           onClick={() => handleOpenReviewModal(record)}
                           className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition-colors"

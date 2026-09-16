@@ -1,4 +1,5 @@
 from datetime import datetime
+from django.db.models import Q
 from rest_framework import viewsets, permissions, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -30,17 +31,19 @@ class CourseViewSet(viewsets.ModelViewSet):
             return Course.objects.none()
 
         qs = Course.objects.filter(is_deleted=False).select_related('department', 'college').prefetch_related('batches')
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL':
+            if user.college:
+                return qs.filter(college=user.college)
             return qs
         return qs.filter(college=user.college)
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role != 'SUPER_ADMIN':
-            serializer.save(college=user.college)
-        else:
+        if user.role == 'PRINCIPAL':
             college_id = self.request.data.get('college_id') or user.college_id
             serializer.save(college_id=college_id)
+        else:
+            serializer.save(college=user.college)
 
 
 class BatchViewSet(viewsets.ModelViewSet):
@@ -64,17 +67,19 @@ class BatchViewSet(viewsets.ModelViewSet):
         if course_id:
             qs = qs.filter(course_id=course_id)
 
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL':
+            if user.college:
+                return qs.filter(college=user.college)
             return qs
         return qs.filter(college=user.college)
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role != 'SUPER_ADMIN':
-            serializer.save(college=user.college)
-        else:
+        if user.role == 'PRINCIPAL':
             college_id = self.request.data.get('college_id') or user.college_id
             serializer.save(college_id=college_id)
+        else:
+            serializer.save(college=user.college)
 
 
 class SemesterViewSet(viewsets.ModelViewSet):
@@ -97,17 +102,19 @@ class SemesterViewSet(viewsets.ModelViewSet):
         if batch_id:
             qs = qs.filter(batch_id=batch_id)
 
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL':
+            if user.college:
+                return qs.filter(college=user.college)
             return qs
         return qs.filter(college=user.college)
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role != 'SUPER_ADMIN':
-            serializer.save(college=user.college)
-        else:
+        if user.role == 'PRINCIPAL':
             college_id = self.request.data.get('college_id') or user.college_id
             serializer.save(college_id=college_id)
+        else:
+            serializer.save(college=user.college)
 
 
 class SubjectViewSet(viewsets.ModelViewSet):
@@ -135,17 +142,19 @@ class SubjectViewSet(viewsets.ModelViewSet):
         if sem_num:
             qs = qs.filter(semester_number=sem_num)
 
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL':
+            if user.college:
+                return qs.filter(college=user.college)
             return qs
         return qs.filter(college=user.college)
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role != 'SUPER_ADMIN':
-            serializer.save(college=user.college)
-        else:
+        if user.role == 'PRINCIPAL':
             college_id = self.request.data.get('college_id') or user.college_id
             serializer.save(college_id=college_id)
+        else:
+            serializer.save(college=user.college)
 
 
 class FacultySubjectViewSet(viewsets.ModelViewSet):
@@ -168,17 +177,19 @@ class FacultySubjectViewSet(viewsets.ModelViewSet):
         if batch_id:
             qs = qs.filter(batch_id=batch_id)
 
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL':
+            if user.college:
+                return qs.filter(college=user.college)
             return qs
         return qs.filter(college=user.college)
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role != 'SUPER_ADMIN':
-            serializer.save(college=user.college)
-        else:
+        if user.role == 'PRINCIPAL':
             college_id = self.request.data.get('college_id') or user.college_id
             serializer.save(college_id=college_id)
+        else:
+            serializer.save(college=user.college)
 
 
 class TimetableEntryViewSet(viewsets.ModelViewSet):
@@ -208,13 +219,26 @@ class TimetableEntryViewSet(viewsets.ModelViewSet):
         if day:
             qs = qs.filter(day_of_week=day)
 
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL' and not user.college_id:
             return qs
-        return qs.filter(college=user.college)
+
+        qs = qs.filter(college=user.college)
+
+        # Restrict Faculty to Lab sessions only (Practical/Hybrid or Lab rooms)
+        if user.role == 'FACULTY':
+            qs = qs.filter(
+                Q(subject__subject_type__in=['PRACTICAL', 'HYBRID']) |
+                Q(room__icontains='Lab')
+            )
+            faculty_profile = getattr(user, 'faculty_profile', None)
+            if faculty_profile:
+                qs = qs.filter(faculty=faculty_profile)
+
+        return qs
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role != 'SUPER_ADMIN':
+        if not (user.role == 'PRINCIPAL' and not user.college_id):
             serializer.save(college=user.college)
         else:
             college_id = self.request.data.get('college_id') or user.college_id

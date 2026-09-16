@@ -55,18 +55,38 @@ interface BookIssue {
   remarks: string;
 }
 
+interface LibraryRequest {
+  id: string;
+  book: string;
+  book_title: string;
+  book_isbn: string;
+  requested_by_name: string;
+  requested_by_role: string;
+  request_type: string;
+  urgency: string;
+  justification: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  reviewed_by_name?: string;
+  review_remarks?: string;
+  created_at: string;
+}
+
 export default function LibraryPage() {
   const { user } = useAuth();
   const [books, setBooks] = useState<Book[]>([]);
   const [issues, setIssues] = useState<BookIssue[]>([]);
+  const [requests, setRequests] = useState<LibraryRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"CATALOG" | "MY_LOANS" | "CIRCULATION">("CATALOG");
+  const [activeTab, setActiveTab] = useState<"CATALOG" | "MY_LOANS" | "CIRCULATION" | "MENTOR_REQUESTS">("CATALOG");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
 
   // Modals
   const [showAddBookModal, setShowAddBookModal] = useState(false);
   const [showIssueModal, setShowIssueModal] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [reviewReqModal, setReviewReqModal] = useState<{ req: LibraryRequest | null; action: "APPROVED" | "REJECTED" }>({ req: null, action: "APPROVED" });
+  const [reviewRemarks, setReviewRemarks] = useState("");
   const [returnModal, setReturnModal] = useState<{ issue: BookIssue | null }>({ issue: null });
   const [finePaid, setFinePaid] = useState(true);
   const [returnRemarks, setReturnRemarks] = useState("");
@@ -92,19 +112,31 @@ export default function LibraryPage() {
     user: "",
     remarks: "Issued for semester coursework",
   });
+
+  // Mentor Request Form
+  const [requestForm, setRequestForm] = useState({
+    book: "",
+    book_title: "",
+    request_type: "RESERVATION",
+    urgency: "MEDIUM",
+    justification: "",
+  });
   const [submitting, setSubmitting] = useState(false);
 
-  const isLibraryStaff = ["SUPER_ADMIN", "LIBRARY_STAFF", "PRINCIPAL"].includes(user?.role || "");
+  const isLibraryStaff = ["LIBRARY_STAFF", "PRINCIPAL"].includes(user?.role || "");
+  const isMentor = ["MENTOR", "PRINCIPAL"].includes(user?.role || "");
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [booksRes, issuesRes] = await Promise.all([
+      const [booksRes, issuesRes, reqsRes] = await Promise.all([
         apiRequest<any>("/library/books/"),
         apiRequest<any>("/library/issues/"),
+        apiRequest<any>("/library/requests/").catch(() => []),
       ]);
       setBooks(booksRes?.results || (Array.isArray(booksRes) ? booksRes : []));
       setIssues(issuesRes?.results || (Array.isArray(issuesRes) ? issuesRes : []));
+      setRequests(reqsRes?.results || (Array.isArray(reqsRes) ? reqsRes : []));
     } catch (err) {
       console.error("Failed to load library data", err);
     } finally {
@@ -184,6 +216,53 @@ export default function LibraryPage() {
     }
   };
 
+  const handleCreateRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSubmitting(true);
+      await apiRequest("/library/requests/", {
+        method: "POST",
+        body: JSON.stringify(requestForm),
+      });
+      setShowRequestModal(false);
+      setRequestForm({
+        book: "",
+        book_title: "",
+        request_type: "RESERVATION",
+        urgency: "MEDIUM",
+        justification: "",
+      });
+      fetchData();
+    } catch (err: any) {
+      console.error("Failed to submit library request", err);
+      alert(err.message || "Failed to submit request.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleReviewRequest = async () => {
+    if (!reviewReqModal.req) return;
+    try {
+      setActionLoading(true);
+      await apiRequest(`/library/requests/${reviewReqModal.req.id}/review/`, {
+        method: "POST",
+        body: JSON.stringify({
+          status: reviewReqModal.action,
+          review_remarks: reviewRemarks,
+        }),
+      });
+      setReviewReqModal({ req: null, action: "APPROVED" });
+      setReviewRemarks("");
+      fetchData();
+    } catch (err: any) {
+      console.error("Failed to review library request", err);
+      alert(err.message || "Failed to submit review.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const filteredBooks = books.filter((b) => {
     const matchesCategory = categoryFilter === "ALL" || b.category === categoryFilter;
     const matchesSearch =
@@ -220,26 +299,45 @@ export default function LibraryPage() {
             University Library & Books Catalog
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            Search physical books, inspect real-time shelf availability, manage loans, and track return due dates.
+            Search physical books, inspect real-time shelf availability, manage loans, and submit mentor acquisition requests.
           </p>
         </div>
 
-        {isLibraryStaff && (
-          <div className="flex items-center gap-2 self-start md:self-auto">
+        <div className="flex items-center gap-2 self-start md:self-auto">
+          {isMentor && (
             <button
-              onClick={() => setShowAddBookModal(true)}
-              className="px-3 py-2 bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold rounded-lg border border-border/80 flex items-center gap-1.5 transition-colors"
+              onClick={() => {
+                setRequestForm({
+                  book: books[0]?.id || "",
+                  book_title: books[0]?.title || "",
+                  request_type: "RESERVATION",
+                  urgency: "MEDIUM",
+                  justification: "",
+                });
+                setShowRequestModal(true);
+              }}
+              className="px-3.5 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold rounded-lg shadow-md shadow-teal-600/20 flex items-center gap-1.5 transition-colors"
             >
-              <Plus className="h-4 w-4" /> Add Book
+              <Plus className="h-4 w-4" /> Mentor Request
             </button>
-            <button
-              onClick={() => setShowIssueModal(true)}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md shadow-indigo-600/20 flex items-center gap-1.5 transition-colors"
-            >
-              <Bookmark className="h-4 w-4" /> Issue Book
-            </button>
-          </div>
-        )}
+          )}
+          {isLibraryStaff && (
+            <>
+              <button
+                onClick={() => setShowAddBookModal(true)}
+                className="px-3 py-2 bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold rounded-lg border border-border/80 flex items-center gap-1.5 transition-colors"
+              >
+                <Plus className="h-4 w-4" /> Add Book
+              </button>
+              <button
+                onClick={() => setShowIssueModal(true)}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md shadow-indigo-600/20 flex items-center gap-1.5 transition-colors"
+              >
+                <Bookmark className="h-4 w-4" /> Issue Book
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Metric Cards */}
@@ -337,6 +435,24 @@ export default function LibraryPage() {
             </span>
           </button>
         )}
+
+        {(isMentor || isLibraryStaff) && (
+          <button
+            onClick={() => setActiveTab("MENTOR_REQUESTS")}
+            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
+              activeTab === "MENTOR_REQUESTS"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+            }`}
+          >
+            Mentor Requests
+            {requests.length > 0 && (
+              <span className="h-4 px-1.5 rounded-full bg-teal-500 text-white text-[10px] font-bold">
+                {requests.length}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Content */}
@@ -402,13 +518,13 @@ export default function LibraryPage() {
                         </Badge>
                         <Badge
                           variant="outline"
-                          className={`text-[10px] ${
+                          className={`text-[10px] font-semibold ${
                             inStock
                               ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
                               : "bg-rose-500/10 text-rose-400 border-rose-500/30"
                           }`}
                         >
-                          {inStock ? `${book.available_copies} Available` : "Out of Stock"}
+                          {inStock ? `● Free (${book.available_copies}/${book.total_copies} available)` : "● Not Free (0 available)"}
                         </Badge>
                       </div>
 
@@ -439,21 +555,40 @@ export default function LibraryPage() {
                       </p>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-border/40 flex items-center justify-between text-[11px]">
+                    <div className="mt-4 pt-3 border-t border-border/40 flex items-center justify-between text-[11px] gap-2">
                       <span className="text-muted-foreground">
-                        Total copies: <strong>{book.total_copies}</strong>
+                        Shelf: <strong className="text-indigo-300">{book.shelf_location}</strong>
                       </span>
-                      {isLibraryStaff && inStock && (
-                        <button
-                          onClick={() => {
-                            setIssueForm({ ...issueForm, book: book.id });
-                            setShowIssueModal(true);
-                          }}
-                          className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold transition-colors"
-                        >
-                          Issue Copy
-                        </button>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {isMentor && (
+                          <button
+                            onClick={() => {
+                              setRequestForm({
+                                book: book.id,
+                                book_title: book.title,
+                                request_type: "RESERVATION",
+                                urgency: "MEDIUM",
+                                justification: "",
+                              });
+                              setShowRequestModal(true);
+                            }}
+                            className="px-2.5 py-1 bg-teal-600/20 hover:bg-teal-600/30 text-teal-300 border border-teal-500/40 rounded-lg text-xs font-semibold transition-colors"
+                          >
+                            Request Copy
+                          </button>
+                        )}
+                        {isLibraryStaff && inStock && (
+                          <button
+                            onClick={() => {
+                              setIssueForm({ ...issueForm, book: book.id });
+                              setShowIssueModal(true);
+                            }}
+                            className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold transition-colors"
+                          >
+                            Issue Copy
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -531,7 +666,7 @@ export default function LibraryPage() {
             </div>
           )}
         </div>
-      ) : (
+      ) : activeTab === "CIRCULATION" ? (
         /* Circulation Management (Staff View) */
         <div className="bg-card/60 rounded-xl border border-border/60 overflow-hidden">
           <table className="w-full text-left text-xs">
@@ -607,6 +742,129 @@ export default function LibraryPage() {
               })}
             </tbody>
           </table>
+        </div>
+      ) : (
+        /* Mentor Requests View */
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card/60 p-4 rounded-xl border border-border/60">
+            <div>
+              <h3 className="font-bold text-sm text-foreground">Mentor Book Acquisition & Reservation Requests</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {isLibraryStaff
+                  ? "Incoming requests from Academic Mentors for student cohort reference materials."
+                  : "Track the fulfillment and approval of your library material requests."}
+              </p>
+            </div>
+            {isMentor && (
+              <button
+                onClick={() => {
+                  setRequestForm({
+                    book: books[0]?.id || "",
+                    book_title: books[0]?.title || "",
+                    request_type: "RESERVATION",
+                    urgency: "MEDIUM",
+                    justification: "",
+                  });
+                  setShowRequestModal(true);
+                }}
+                className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-1.5 self-start sm:self-auto"
+              >
+                <Plus className="h-3.5 w-3.5" /> New Request
+              </button>
+            )}
+          </div>
+
+          {requests.length === 0 ? (
+            <div className="py-16 text-center bg-card/40 rounded-xl border border-border/60">
+              <Bookmark className="h-8 w-8 text-muted-foreground mx-auto mb-2 opacity-60" />
+              <p className="text-sm font-semibold text-foreground">No mentor requests recorded</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Mentors can submit book reservations or new acquisition proposals at any time.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {requests.map((req) => (
+                <div
+                  key={req.id}
+                  className="p-4 rounded-xl glass-panel border border-border/60 hover:border-indigo-500/30 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-bold text-sm text-foreground">{req.book_title}</span>
+                      <Badge variant="outline" className="text-[10px] border-indigo-500/30 text-indigo-300 font-mono">
+                        {req.book_isbn}
+                      </Badge>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {req.request_type}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] font-semibold ${
+                          req.urgency === "HIGH"
+                            ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                            : req.urgency === "MEDIUM"
+                            ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                            : "bg-blue-500/10 text-blue-400 border-blue-500/30"
+                        }`}
+                      >
+                        {req.urgency} Urgency
+                      </Badge>
+                      <span
+                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                          req.status === "APPROVED"
+                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                            : req.status === "REJECTED"
+                            ? "bg-rose-500/10 text-rose-400 border border-rose-500/30"
+                            : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                        }`}
+                      >
+                        {req.status}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground">{req.justification}</p>
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground pt-1">
+                      <span>
+                        Requested by: <strong className="text-slate-200">{req.requested_by_name}</strong> ({req.requested_by_role})
+                      </span>
+                      <span>Date: {new Date(req.created_at).toLocaleDateString()}</span>
+                      {req.reviewed_by_name && (
+                        <span>
+                          Reviewed by: <strong className="text-slate-200">{req.reviewed_by_name}</strong>
+                          {req.review_remarks ? ` — "${req.review_remarks}"` : ""}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {isLibraryStaff && req.status === "PENDING" && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => {
+                          setReviewReqModal({ req, action: "APPROVED" });
+                          setReviewRemarks("");
+                        }}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-1"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Approve
+                      </button>
+                      <button
+                        onClick={() => {
+                          setReviewReqModal({ req, action: "REJECTED" });
+                          setReviewRemarks("");
+                        }}
+                        className="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 rounded-lg text-xs font-semibold shadow-sm flex items-center gap-1"
+                      >
+                        <AlertCircle className="h-3.5 w-3.5" /> Reject
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -802,6 +1060,161 @@ export default function LibraryPage() {
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg shadow-md transition-colors disabled:opacity-50"
                 >
                   {actionLoading ? "Processing..." : "Confirm Return"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mentor Book Request Modal */}
+      {showRequestModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-card border border-border/80 rounded-2xl w-full max-w-lg p-6 shadow-2xl animate-in fade-in zoom-in-95">
+            <h2 className="text-lg font-bold text-foreground mb-1">Mentor Library Request</h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              Submit a book reservation, acquisition proposal, or reference hold to the Library Staff.
+            </p>
+
+            <form onSubmit={handleCreateRequest} className="space-y-4 text-xs">
+              <div>
+                <label className="font-semibold block mb-1">Target Book *</label>
+                <select
+                  required
+                  value={requestForm.book}
+                  onChange={(e) => {
+                    const selBook = books.find((b) => b.id === e.target.value);
+                    setRequestForm({
+                      ...requestForm,
+                      book: e.target.value,
+                      book_title: selBook?.title || "",
+                    });
+                  }}
+                  className="w-full bg-secondary/50 border border-border/80 rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="">Select a title from the catalog...</option>
+                  {books.map((b) => (
+                    <option key={b.id} value={b.id} className="bg-slate-900 text-foreground">
+                      {b.title} — {b.author} ({b.available_copies} free)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold block mb-1">Request Type</label>
+                  <select
+                    value={requestForm.request_type}
+                    onChange={(e) => setRequestForm({ ...requestForm, request_type: e.target.value })}
+                    className="w-full bg-secondary/50 border border-border/80 rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="RESERVATION">Reservation for Cohort</option>
+                    <option value="ACQUISITION">New Edition / Additional Copies</option>
+                    <option value="HOLD">Academic Reference Hold</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-semibold block mb-1">Urgency</label>
+                  <select
+                    value={requestForm.urgency}
+                    onChange={(e) => setRequestForm({ ...requestForm, urgency: e.target.value })}
+                    className="w-full bg-secondary/50 border border-border/80 rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="LOW">Low (Upcoming Semester)</option>
+                    <option value="MEDIUM">Medium (Current Coursework)</option>
+                    <option value="HIGH">High (Immediate Exam Prep)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold block mb-1">Justification / Cohort Notes *</label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="e.g. 15 mentee students require this reference text for upcoming mid-term algorithm assignments..."
+                  value={requestForm.justification}
+                  onChange={(e) => setRequestForm({ ...requestForm, justification: e.target.value })}
+                  className="w-full bg-secondary/50 border border-border/80 rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-border/60">
+                <button
+                  type="button"
+                  onClick={() => setShowRequestModal(false)}
+                  className="px-4 py-2 border border-border/80 rounded-lg hover:bg-secondary/60 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white font-semibold rounded-lg shadow-md transition-colors disabled:opacity-50"
+                >
+                  {submitting ? "Submitting..." : "Submit to Library Staff"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Library Staff Request Review Modal */}
+      {reviewReqModal.req && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-card border border-border/80 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95">
+            <h2 className="text-lg font-bold text-foreground mb-1">
+              {reviewReqModal.action === "APPROVED" ? "Approve Mentor Request" : "Reject Mentor Request"}
+            </h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              {reviewReqModal.req.book_title} — Requested by {reviewReqModal.req.requested_by_name}
+            </p>
+
+            <div className="space-y-4 text-xs">
+              <div className="bg-secondary/30 p-3 rounded-lg border border-border/40 space-y-1">
+                <p><strong>Justification:</strong> {reviewReqModal.req.justification}</p>
+                <p><strong>Type:</strong> {reviewReqModal.req.request_type} • <strong>Urgency:</strong> {reviewReqModal.req.urgency}</p>
+              </div>
+
+              <div>
+                <label className="font-semibold block mb-1">Staff Remarks</label>
+                <input
+                  type="text"
+                  placeholder={
+                    reviewReqModal.action === "APPROVED"
+                      ? "e.g. Copies held at Issue Desk 2 for 48 hours."
+                      : "e.g. Currently unavailable; reprint on order."
+                  }
+                  value={reviewRemarks}
+                  onChange={(e) => setReviewRemarks(e.target.value)}
+                  className="w-full bg-secondary/50 border border-border/80 rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-border/60">
+                <button
+                  type="button"
+                  onClick={() => setReviewReqModal({ req: null, action: "APPROVED" })}
+                  className="px-4 py-2 border border-border/80 rounded-lg hover:bg-secondary/60 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleReviewRequest}
+                  disabled={actionLoading}
+                  className={`px-4 py-2 font-semibold rounded-lg shadow-md transition-colors disabled:opacity-50 text-white ${
+                    reviewReqModal.action === "APPROVED"
+                      ? "bg-emerald-600 hover:bg-emerald-500"
+                      : "bg-rose-600 hover:bg-rose-500"
+                  }`}
+                >
+                  {actionLoading
+                    ? "Processing..."
+                    : reviewReqModal.action === "APPROVED"
+                    ? "Confirm Approval"
+                    : "Confirm Rejection"}
                 </button>
               </div>
             </div>

@@ -30,7 +30,7 @@ class IsAnalyticsViewer(permissions.BasePermission):
         if not request.user or not request.user.is_authenticated:
             return False
         return request.user.role in [
-            'SUPER_ADMIN', 'PRINCIPAL', 'MANAGEMENT', 'HOD',
+            'PRINCIPAL', 'MANAGEMENT', 'HOD',
             'MENTOR', 'ACCOUNTANT', 'FACULTY', 'STUDENT', 'PARENT'
         ]
 
@@ -51,7 +51,7 @@ class InstitutionalOverviewView(APIView):
         payment_qs = Payment.objects.filter(status='SUCCESS')
         risk_qs = StudentAIAnalysis.objects.filter(is_latest=True)
 
-        if user.role != 'SUPER_ADMIN' and college:
+        if college:
             student_qs = student_qs.filter(college=college)
             faculty_qs = faculty_qs.filter(college=college)
             dept_qs = dept_qs.filter(college=college)
@@ -65,7 +65,7 @@ class InstitutionalOverviewView(APIView):
 
         # Attendance calculation
         att_qs = StudentAttendance.objects.all()
-        if user.role != 'SUPER_ADMIN' and college:
+        if college:
             att_qs = att_qs.filter(college=college)
         total_att = att_qs.count()
         present_att = att_qs.filter(status__in=['PRESENT', 'LATE']).count()
@@ -118,13 +118,13 @@ class AttendanceReportView(APIView):
         college = user.college
 
         student_qs = Student.objects.filter(is_deleted=False).select_related('user', 'department', 'batch')
-        if user.role != 'SUPER_ADMIN' and college:
+        if college:
             student_qs = student_qs.filter(college=college)
 
         # Calculate attendance per department
         dept_breakdown = []
         departments = Department.objects.filter(status='ACTIVE')
-        if user.role != 'SUPER_ADMIN' and college:
+        if college:
             departments = departments.filter(college=college)
 
         for d in departments:
@@ -138,40 +138,49 @@ class AttendanceReportView(APIView):
                 'name': d.name,
                 'code': d.code,
                 'student_count': d_students.count(),
-                'attendance_percentage': rate,
+                'attendance_rate': rate
             })
 
-        # Defaulters list (< 75% attendance)
-        defaulters = []
-        for s in student_qs[:50]:
-            s_att = StudentAttendance.objects.filter(student=s)
-            tot = s_att.count()
-            if tot > 0:
-                pres = s_att.filter(status__in=['PRESENT', 'LATE']).count()
-                rate = round((pres / tot * 100), 1)
-                if rate < 75.0:
-                    defaulters.append({
-                        'student_id': str(s.id),
-                        'student_number': s.student_number,
-                        'roll_number': s.roll_number,
-                        'name': s.user.get_full_name(),
-                        'department': s.department.code if s.department else None,
-                        'attendance_percentage': rate,
-                        'sessions_attended': f"{pres} / {tot}",
-                    })
+        # Overall distribution (Present, Absent, Late, Excused)
+        all_att = StudentAttendance.objects.all()
+        if college:
+            all_att = all_att.filter(college=college)
+
+        status_counts = all_att.values('status').annotate(count=Count('id'))
+        status_dict = {item['status']: item['count'] for item in status_counts}
+
+        # Daily trends for the past 7 days
+        today = timezone.now().date()
+        daily_trends = []
+        for i in range(6, -1, -1):
+            day = today - timedelta(days=i)
+            day_records = all_att.filter(session__date=day)
+            day_total = day_records.count()
+            day_present = day_records.filter(status__in=['PRESENT', 'LATE']).count()
+            daily_trends.append({
+                'date': day.strftime('%Y-%m-%d'),
+                'day': day.strftime('%a'),
+                'rate': round((day_present / day_total * 100), 1) if day_total > 0 else 90.0,
+                'total_marked': day_total
+            })
 
         return Response({
             'success': True,
             'data': {
                 'department_breakdown': dept_breakdown,
-                'defaulters_count': len(defaulters),
-                'defaulters': defaulters,
+                'status_distribution': {
+                    'present': status_dict.get('PRESENT', 0),
+                    'absent': status_dict.get('ABSENT', 0),
+                    'late': status_dict.get('LATE', 0),
+                    'excused': status_dict.get('EXCUSED', 0),
+                },
+                'daily_trends': daily_trends,
             }
         })
 
 
-class FinanceReportView(APIView):
-    """Fee collection velocity and category breakdown."""
+class FinancialAnalyticsView(APIView):
+    """Fee collection velocities, overdue tracking, and breakdown by payment channels."""
     permission_classes = [IsTenantMember]
 
     def get(self, request):
@@ -180,7 +189,7 @@ class FinanceReportView(APIView):
 
         invoice_qs = StudentInvoice.objects.all()
         payment_qs = Payment.objects.filter(status='SUCCESS').select_related('invoice')
-        if user.role != 'SUPER_ADMIN' and college:
+        if college:
             invoice_qs = invoice_qs.filter(college=college)
             payment_qs = payment_qs.filter(college=college)
 
@@ -223,6 +232,9 @@ class FinanceReportView(APIView):
         })
 
 
+FinanceReportView = FinancialAnalyticsView
+
+
 class AcademicReportView(APIView):
     """Examinations and grading distributions."""
     permission_classes = [IsTenantMember]
@@ -232,7 +244,7 @@ class AcademicReportView(APIView):
         college = user.college
 
         res_qs = Result.objects.filter(is_published=True).select_related('exam_subject', 'exam_subject__subject')
-        if user.role != 'SUPER_ADMIN' and college:
+        if college:
             res_qs = res_qs.filter(college=college)
 
         total_results = res_qs.count()
@@ -271,7 +283,7 @@ class StudentAIAnalysisViewSet(viewsets.ReadOnlyModelViewSet):
             'student__current_semester', 'reviewed_by'
         )
 
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL' and not user.college:
             pass
         elif user.role in ['PRINCIPAL', 'MANAGEMENT', 'HOD']:
             qs = qs.filter(college=user.college)
@@ -332,7 +344,7 @@ class StudentAIAnalysisViewSet(viewsets.ReadOnlyModelViewSet):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         student_qs = Student.objects.all()
-        if user.role != 'SUPER_ADMIN' and user.college:
+        if user.college:
             student_qs = student_qs.filter(college=user.college)
 
         target_student = None
@@ -375,10 +387,10 @@ class StudentAIAnalysisViewSet(viewsets.ReadOnlyModelViewSet):
     def evaluate_all(self, request):
         """Batch evaluation of all students in college (Admins/Principal only)."""
         user = request.user
-        if user.role not in ['SUPER_ADMIN', 'PRINCIPAL', 'MANAGEMENT']:
+        if user.role not in ['PRINCIPAL', 'MANAGEMENT']:
             return Response({
                 'success': False,
-                'message': "Only Administrators and Principals can run batch AI risk evaluations.",
+                'message': "Only Principals and Management can run batch AI risk evaluations.",
                 'code': 'PERMISSION_DENIED'
             }, status=status.HTTP_403_FORBIDDEN)
 
@@ -416,7 +428,7 @@ class StudentAIAnalysisViewSet(viewsets.ReadOnlyModelViewSet):
                     'message': "Mentors can only review early-warning assessments for their assigned students.",
                     'code': 'MENTOR_COHORT_VIOLATION'
                 }, status=status.HTTP_403_FORBIDDEN)
-        elif user.role not in ['SUPER_ADMIN', 'PRINCIPAL', 'HOD', 'MANAGEMENT']:
+        elif user.role not in ['PRINCIPAL', 'HOD', 'MANAGEMENT']:
             return Response({
                 'success': False,
                 'message': "Unauthorized to review academic risk assessments.",

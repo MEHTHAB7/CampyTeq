@@ -53,6 +53,12 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
+        user = self.request.user
+        category = serializer.validated_data.get("category", "ACADEMIC")
+        if user.role == "ACCOUNTANT" and category != "FEES":
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"category": "Accountants are only authorized to publish Fee announcements."})
+
         serializer.save(
             college=self.request.user.college,
             created_by=self.request.user,

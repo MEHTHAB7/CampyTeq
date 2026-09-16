@@ -23,8 +23,8 @@ class TestCameraAndTrackingWorkflow:
         self.other_college = College.objects.create(name="Beta Tech", code="BETA-CAM", slug="beta-cam", status="ACTIVE")
 
         # Users
-        self.security_officer = User.objects.create_user(
-            email="security@apex.edu", password="Password123!", role="SECURITY", college=self.college, first_name="Balwinder"
+        self.hod_officer = User.objects.create_user(
+            email="hod@apex.edu", password="Password123!", role="HOD", college=self.college, first_name="Balwinder"
         )
         self.principal = User.objects.create_user(
             email="principal@apex.edu", password="Password123!", role="PRINCIPAL", college=self.college, first_name="Rajesh"
@@ -38,8 +38,8 @@ class TestCameraAndTrackingWorkflow:
         self.student_user_2 = User.objects.create_user(
             email="ananya@apex.edu", password="Password123!", role="STUDENT", college=self.college, first_name="Ananya"
         )
-        self.other_security = User.objects.create_user(
-            email="security@beta.edu", password="Password123!", role="SECURITY", college=self.other_college, first_name="BetaOfficer"
+        self.other_hod = User.objects.create_user(
+            email="hod@beta.edu", password="Password123!", role="HOD", college=self.other_college, first_name="BetaOfficer"
         )
 
         # Department, Faculty, Students
@@ -105,7 +105,7 @@ class TestCameraAndTrackingWorkflow:
 
     def test_camera_and_zone_crud_and_tenant_isolation(self):
         """Verify camera directory and tenant isolation between colleges."""
-        self.client.force_authenticate(user=self.security_officer)
+        self.client.force_authenticate(user=self.hod_officer)
 
         # 1. Apex security lists zones
         res = self.client.get('/api/v1/cameras/zones/')
@@ -135,7 +135,7 @@ class TestCameraAndTrackingWorkflow:
 
     def test_camera_heartbeat_action(self):
         """Verify camera heartbeat updates status and timestamp."""
-        self.client.force_authenticate(user=self.security_officer)
+        self.client.force_authenticate(user=self.hod_officer)
 
         res = self.client.post(f'/api/v1/cameras/cameras/{self.camera_gate.id}/heartbeat/', {
             'status': 'ONLINE',
@@ -148,7 +148,7 @@ class TestCameraAndTrackingWorkflow:
 
     def test_edge_detection_ingestion_updates_latest_location(self):
         """Verify edge detection ingest endpoint updates latest location and logs event."""
-        self.client.force_authenticate(user=self.security_officer)
+        self.client.force_authenticate(user=self.hod_officer)
 
         det_time = timezone.now() - timedelta(minutes=10)
         res = self.client.post('/api/v1/tracking/ingest/', {
@@ -224,7 +224,7 @@ class TestCameraAndTrackingWorkflow:
 
     def test_tracking_search_requires_reason_and_creates_audit_log(self):
         """Verify mandatory operational reason and audit log creation."""
-        self.client.force_authenticate(user=self.security_officer)
+        self.client.force_authenticate(user=self.hod_officer)
 
         # 1. Missing reason -> Bad Request (400)
         res1 = self.client.get('/api/v1/tracking/last-seen/', {
@@ -248,7 +248,7 @@ class TestCameraAndTrackingWorkflow:
         })
         assert res3.status_code == 200
 
-        log = TrackingAccessLog.objects.filter(student=self.student_1, user=self.security_officer).first()
+        log = TrackingAccessLog.objects.filter(student=self.student_1, user=self.hod_officer).first()
         assert log is not None
         assert log.reason == valid_reason
 

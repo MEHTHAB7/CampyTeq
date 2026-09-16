@@ -36,6 +36,20 @@ class LeaveRequest(TenantModel):
         choices=LeaveStatus.choices,
         default=LeaveStatus.PENDING,
     )
+    routed_to = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_leave_reviews",
+        help_text="The specific reviewer at this hierarchy level assigned to review this request."
+    )
+    routed_tier = models.CharField(
+        max_length=30,
+        blank=True,
+        default="",
+        help_text="Target approval tier: MENTOR, HOD, or PRINCIPAL."
+    )
     approved_by = models.ForeignKey(
         "accounts.User",
         on_delete=models.SET_NULL,

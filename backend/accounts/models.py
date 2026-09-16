@@ -19,7 +19,7 @@ class UserManager(BaseUserManager):
     def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-        extra_fields.setdefault('role', 'SUPER_ADMIN')
+        extra_fields.setdefault('role', 'PRINCIPAL')
         extra_fields.setdefault('status', 'ACTIVE')
         return self.create_user(email, password, **extra_fields)
 
@@ -56,7 +56,6 @@ class Role(models.Model):
 
 class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     ROLE_CHOICES = [
-        ('SUPER_ADMIN', 'Super Admin'),
         ('PRINCIPAL', 'Principal'),
         ('MANAGEMENT', 'Management'),
         ('HOD', 'Head of Department'),
@@ -65,7 +64,6 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         ('ACCOUNTANT', 'Accountant'),
         ('STUDENT', 'Student'),
         ('PARENT', 'Parent/Guardian'),
-        ('SECURITY', 'Security Administrator'),
         ('PRINT_STAFF', 'Print Shop Staff'),
         ('LIBRARY_STAFF', 'Library Staff'),
     ]
@@ -90,7 +88,7 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         on_delete=models.CASCADE,
         related_name='users',
         db_index=True,
-        help_text="Tenant association. Nullable ONLY for cross-college Super Admin."
+        help_text="Tenant association. Nullable for cross-tenant Principal."
     )
 
     custom_roles = models.ManyToManyField(Role, related_name='users', blank=True)
@@ -123,7 +121,7 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
 
     def get_all_permissions_list(self):
         """Returns set of all permission codes assigned via primary role and custom roles."""
-        if self.role == 'SUPER_ADMIN':
+        if self.role == 'PRINCIPAL':
             return set(Permission.objects.values_list('code', flat=True))
 
         perm_codes = set()

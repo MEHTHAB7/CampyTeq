@@ -196,7 +196,7 @@ export default function CamerasAndTrackingPage() {
       }
 
       // Load detection stream & audit logs if role is authorized
-      if (["SUPER_ADMIN", "PRINCIPAL", "SECURITY"].includes(user?.role || "")) {
+      if (["PRINCIPAL", "HOD"].includes(user?.role || "")) {
         const [detData, auditData] = await Promise.all([
           apiRequest("/tracking/detections/").catch(() => null),
           apiRequest("/tracking/audit-logs/").catch(() => null),
@@ -217,6 +217,20 @@ export default function CamerasAndTrackingPage() {
       setRefreshing(false);
     }
   };
+
+  if (user && !["PRINCIPAL", "HOD", "MENTOR"].includes(user.role)) {
+    return (
+      <div className="p-8 flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <div className="h-16 w-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+          <AlertCircle className="h-8 w-8" />
+        </div>
+        <h2 className="text-xl font-bold text-foreground">Restricted Camera & CCTV Access</h2>
+        <p className="text-sm text-muted-foreground max-w-md">
+          Campus surveillance and location tracking are strictly restricted to Principal, Heads of Department (HOD), and Mentors.
+        </p>
+      </div>
+    );
+  }
 
   useEffect(() => {
     loadDashboardData();
@@ -285,7 +299,7 @@ export default function CamerasAndTrackingPage() {
     return true;
   });
 
-  const isSecurityOrAdmin = ["SUPER_ADMIN", "PRINCIPAL", "SECURITY"].includes(user?.role || "");
+  const isSecurityOrAdmin = ["PRINCIPAL", "HOD"].includes(user?.role || "");
 
   return (
     <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto">

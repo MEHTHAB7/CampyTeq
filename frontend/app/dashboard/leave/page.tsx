@@ -33,6 +33,8 @@ interface LeaveRequest {
   approved_by_name?: string;
   approval_remarks?: string;
   reviewed_at?: string;
+  routed_tier?: "MENTOR" | "HOD" | "PRINCIPAL";
+  routed_to_name?: string;
   created_at: string;
 }
 
@@ -58,7 +60,7 @@ export default function LeaveManagementPage() {
   });
   const [submitting, setSubmitting] = useState(false);
 
-  const isReviewer = ["SUPER_ADMIN", "PRINCIPAL", "HOD", "MENTOR"].includes(user?.role || "");
+  const isReviewer = ["PRINCIPAL", "HOD", "MENTOR"].includes(user?.role || "");
 
   const fetchLeaves = async () => {
     try {
@@ -276,11 +278,16 @@ export default function LeaveManagementPage() {
                 >
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-bold text-foreground text-sm">{req.user_name}</span>
                         <Badge variant="outline" className="text-[10px]">
                           {req.user_role}
                         </Badge>
+                        {req.routed_tier && (
+                          <Badge variant="outline" className="text-[10px] border-purple-500/30 text-purple-300">
+                            Tier: {req.routed_tier === "MENTOR" ? "Student → Mentor" : req.routed_tier === "HOD" ? "Faculty → HOD" : "HOD → Principal"}
+                          </Badge>
+                        )}
                       </div>
                       <Badge variant="outline" className={statusBadges[req.status]?.badge}>
                         {statusBadges[req.status]?.label}
@@ -350,7 +357,12 @@ export default function LeaveManagementPage() {
                   {myLeaves.map((leave) => (
                     <tr key={leave.id} className="hover:bg-secondary/20 transition-colors">
                       <td className="p-3.5 font-semibold text-foreground">
-                        {leave.leave_type.replace("_", " ")}
+                        <div>{leave.leave_type.replace("_", " ")}</div>
+                        {leave.routed_tier && (
+                          <span className="text-[10px] text-purple-300 font-normal block">
+                            Approver: {leave.routed_tier === "MENTOR" ? "Mentor" : leave.routed_tier === "HOD" ? "HOD" : "Principal"}
+                          </span>
+                        )}
                       </td>
                       <td className="p-3.5 text-muted-foreground font-mono">
                         <div>

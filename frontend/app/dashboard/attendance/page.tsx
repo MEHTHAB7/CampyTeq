@@ -154,7 +154,7 @@ export default function AttendancePage() {
       }
 
       // 3. Fetch Defaulters for Staff/Mentors
-      if (["SUPER_ADMIN", "PRINCIPAL", "HOD", "FACULTY", "MENTOR"].includes(user?.role || "")) {
+      if (["PRINCIPAL", "HOD", "FACULTY", "MENTOR"].includes(user?.role || "")) {
         try {
           const defData = await apiRequest<DefaulterStudent[]>("/attendance/students/defaulters/");
           setDefaulters(defData);
@@ -164,7 +164,7 @@ export default function AttendancePage() {
       }
 
       // 4. Fetch Faculty punches if staff
-      if (["SUPER_ADMIN", "PRINCIPAL", "HOD", "FACULTY"].includes(user?.role || "")) {
+      if (["PRINCIPAL", "HOD", "FACULTY"].includes(user?.role || "")) {
         try {
           const fRes = await apiRequest<{ results: FacultyPunch[] } | FacultyPunch[]>("/attendance/faculty/");
           const fList = Array.isArray(fRes) ? fRes : fRes.results || [];
@@ -296,14 +296,22 @@ export default function AttendancePage() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Attendance Management System
+              {user?.role === "FACULTY" ? "Lab Attendance Portal" : "Attendance Management System"}
             </h1>
-            <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-              Biometric & Web Portal
-            </Badge>
+            {user?.role === "FACULTY" ? (
+              <Badge className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                Lab Practical Sessions Only
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                Biometric & Web Portal
+              </Badge>
+            )}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Subject-wise lecture tracking, 1-click roster marking, faculty punches, and low-attendance alert watchlists.
+            {user?.role === "FACULTY"
+              ? "Practical laboratory attendance tracking, lab biometric sign-ins, and student lab rosters."
+              : "Subject-wise lecture tracking, 1-click roster marking, faculty punches, and low-attendance alert watchlists."}
           </p>
         </div>
 
@@ -412,7 +420,7 @@ export default function AttendancePage() {
           </button>
         )}
 
-        {["SUPER_ADMIN", "PRINCIPAL", "HOD", "FACULTY"].includes(user?.role || "") && (
+        {["PRINCIPAL", "HOD", "FACULTY"].includes(user?.role || "") && (
           <button
             onClick={() => setActiveTab("sessions")}
             className={`pb-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
@@ -425,7 +433,7 @@ export default function AttendancePage() {
           </button>
         )}
 
-        {["SUPER_ADMIN", "PRINCIPAL", "HOD", "MENTOR", "FACULTY"].includes(user?.role || "") && (
+        {["PRINCIPAL", "HOD", "MENTOR", "FACULTY"].includes(user?.role || "") && (
           <button
             onClick={() => setActiveTab("defaulters")}
             className={`pb-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
@@ -438,7 +446,7 @@ export default function AttendancePage() {
           </button>
         )}
 
-        {["SUPER_ADMIN", "PRINCIPAL", "HOD", "FACULTY"].includes(user?.role || "") && (
+        {["PRINCIPAL", "HOD", "FACULTY"].includes(user?.role || "") && (
           <button
             onClick={() => setActiveTab("faculty")}
             className={`pb-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${

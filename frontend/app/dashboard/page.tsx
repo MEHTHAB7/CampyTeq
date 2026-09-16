@@ -19,11 +19,9 @@ export default function DashboardPage() {
     case "HOD":
     case "MENTOR":
       return <FacultyDashboard />;
-    case "SUPER_ADMIN":
     case "PRINCIPAL":
     case "MANAGEMENT":
     case "ACCOUNTANT":
-    case "SECURITY":
     case "PRINT_STAFF":
     case "LIBRARY_STAFF":
     default:

@@ -37,6 +37,10 @@ class Book(TenantModel):
         ordering = ["title"]
         unique_together = ["college", "isbn"]
 
+    @property
+    def is_available(self):
+        return self.available_copies > 0
+
     def __str__(self):
         return f"{self.title} by {self.author} ({self.available_copies}/{self.total_copies} avail)"
 
@@ -102,3 +106,57 @@ class BookIssue(TenantModel):
 
     def __str__(self):
         return f"{self.book.title} -> {self.user.get_full_name()} ({self.status})"
+
+
+class LibraryRequest(TenantModel):
+    class RequestType(models.TextChoices):
+        BORROW = "BORROW", "Borrow / Issue Request"
+        RESERVATION = "RESERVATION", "Book Reservation"
+        PROCUREMENT = "PROCUREMENT", "New Title Acquisition"
+
+    class RequestStatus(models.TextChoices):
+        PENDING = "PENDING", "Pending Review"
+        APPROVED = "APPROVED", "Approved"
+        REJECTED = "REJECTED", "Rejected"
+        FULFILLED = "FULFILLED", "Fulfilled / Issued"
+
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="library_requests",
+    )
+    book = models.ForeignKey(
+        Book,
+        on_delete=models.CASCADE,
+        related_name="mentor_requests",
+        null=True,
+        blank=True,
+    )
+    suggested_title = models.CharField(max_length=255, blank=True, default="")
+    request_type = models.CharField(
+        max_length=20,
+        choices=RequestType.choices,
+        default=RequestType.BORROW,
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=RequestStatus.choices,
+        default=RequestStatus.PENDING,
+    )
+    notes = models.TextField(blank=True, default="")
+    reviewed_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_library_requests",
+    )
+    reviewer_remarks = models.TextField(blank=True, default="")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        title = self.book.title if self.book else self.suggested_title
+        return f"{self.user.get_full_name()} -> {title} ({self.status})"

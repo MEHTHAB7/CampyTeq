@@ -1,22 +1,22 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from common.permissions import IsSuperAdmin, IsTenantMember
+from common.permissions import IsPrincipal, IsTenantMember
 from .models import College
 from .serializers import CollegeSerializer, CollegeDetailSerializer
 
 class CollegeViewSet(viewsets.ModelViewSet):
     """
     CRUD for institutional Colleges.
-    Only Super Admins can create or list all colleges.
-    Regular tenant users can only access their current college profile.
+    Principals can create or list colleges.
+    Regular tenant users can access their current college profile.
     """
     queryset = College.objects.filter(is_deleted=False)
     serializer_class = CollegeSerializer
 
     def get_permissions(self):
         if self.action in ['create', 'destroy']:
-            return [IsSuperAdmin()]
+            return [IsPrincipal()]
         if self.action in ['update', 'partial_update']:
             return [permissions.IsAuthenticated()]
         return [permissions.IsAuthenticated()]
@@ -30,7 +30,7 @@ class CollegeViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not user or not user.is_authenticated:
             return College.objects.none()
-        if user.role == 'SUPER_ADMIN':
+        if user.role == 'PRINCIPAL':
             return College.objects.filter(is_deleted=False)
         if user.college_id:
             return College.objects.filter(id=user.college_id, is_deleted=False)
@@ -40,8 +40,7 @@ class CollegeViewSet(viewsets.ModelViewSet):
     def current(self, request):
         """Returns the currently authenticated user's college profile."""
         if not request.user.college:
-            if request.user.role == 'SUPER_ADMIN':
-                # Super Admin without assigned college gets first active or none
+            if request.user.role == 'PRINCIPAL':
                 first_college = College.objects.filter(is_deleted=False).first()
                 if first_college:
                     serializer = self.get_serializer(first_college)

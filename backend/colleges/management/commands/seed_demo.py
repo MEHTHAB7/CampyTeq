@@ -16,10 +16,11 @@ from payroll.models import SalaryStructure, Payslip
 from communication.models import Announcement, Notification, Conversation, Message, Document
 from leave.models import LeaveRequest
 from printshop.models import PrintPricing, PrintOrder
-from library.models import Book, BookIssue
+from library.models import Book, BookIssue, LibraryRequest
 from cameras.models import CameraZone, Camera
 from tracking.models import BiometricProfile, DetectionEvent, StudentLatestLocation, TrackingAccessLog
 from analytics.models import StudentAIAnalysis
+from facilities.models import Facility, FacilityBooking
 
 class Command(BaseCommand):
     help = "Seeds initial demo colleges, users, academic structure, timetable, exams, results, and assignments."
@@ -94,18 +95,16 @@ class Command(BaseCommand):
 
         # 3. Roles
         role_definitions = {
-            "SUPER_ADMIN": ("Super Admin", list(permission_objs.keys())),
             "PRINCIPAL": ("Principal", list(permission_objs.keys())),
             "MANAGEMENT": ("Management", ["student.view", "attendance.view", "fees.view", "payroll.view", "academics.view", "camera.view", "tracking.search"]),
-            "HOD": ("Head of Department", ["student.view", "student.update", "attendance.view", "attendance.mark", "academics.view", "academics.manage", "tracking.search"]),
-            "MENTOR": ("Mentor", ["student.view", "attendance.view", "academics.view", "tracking.search"]),
-            "FACULTY": ("Faculty", ["student.view", "attendance.view", "attendance.mark", "academics.view", "print.create"]),
-            "ACCOUNTANT": ("Accountant", ["fees.view", "fees.create", "fees.update", "payments.record", "payroll.view", "payroll.process"]),
+            "HOD": ("Head of Department", ["student.view", "student.update", "attendance.view", "attendance.mark", "academics.view", "academics.manage", "camera.view", "tracking.search"]),
+            "MENTOR": ("Mentor", ["student.view", "attendance.view", "academics.view", "camera.view", "tracking.search", "print.create", "library.view"]),
+            "FACULTY": ("Faculty", ["student.view", "attendance.view", "attendance.mark", "print.create"]),
+            "ACCOUNTANT": ("Accountant", ["fees.view", "fees.create", "fees.update", "payments.record", "print.create"]),
             "STUDENT": ("Student", ["attendance.view", "academics.view", "fees.view", "print.create", "library.view"]),
             "PARENT": ("Parent/Guardian", ["student.view", "attendance.view", "academics.view", "fees.view"]),
-            "SECURITY": ("Security Administrator", ["camera.view", "camera.manage", "tracking.search"]),
             "PRINT_STAFF": ("Print Shop Staff", ["print.create", "print.manage"]),
-            "LIBRARY_STAFF": ("Library Staff", ["library.view", "library.issue"]),
+            "LIBRARY_STAFF": ("Library Staff", ["library.view", "library.issue", "print.create"]),
         }
 
         for role_code, (role_name, perm_codes) in role_definitions.items():
@@ -115,8 +114,7 @@ class Command(BaseCommand):
         # 4. Demo Users
         default_password = "Password123!"
         demo_users_data = [
-            ("superadmin@campyteq.io", "Antigravity", "SuperAdmin", "SUPER_ADMIN", None, True, True),
-            ("principal@apex.edu", "Dr. Rajesh", "Nambiar", "PRINCIPAL", apex_college, False, False),
+            ("principal@apex.edu", "Dr. Rajesh", "Nambiar", "PRINCIPAL", apex_college, True, True),
             ("management@apex.edu", "Vikram", "Mehta", "MANAGEMENT", apex_college, False, False),
             ("hod.cs@apex.edu", "Dr. Aruna", "Sundaram", "HOD", apex_college, False, False),
             ("mentor.anil@apex.edu", "Anil", "Verma", "MENTOR", apex_college, False, False),
@@ -124,10 +122,8 @@ class Command(BaseCommand):
             ("accountant.raman@apex.edu", "Raman", "Iyer", "ACCOUNTANT", apex_college, False, False),
             ("student.rahul@apex.edu", "Rahul", "Kumar", "STUDENT", apex_college, False, False),
             ("parent.sharma@apex.edu", "Suresh", "Sharma", "PARENT", apex_college, False, False),
-            ("security.chief@apex.edu", "Balwinder", "Singh", "SECURITY", apex_college, False, False),
             ("printstaff.dev@apex.edu", "Dev", "Prasad", "PRINT_STAFF", apex_college, False, False),
             ("librarystaff.anita@apex.edu", "Anita", "Deshmukh", "LIBRARY_STAFF", apex_college, False, False),
-            ("student.other@metro.edu", "Arjun", "Reddy", "STUDENT", metro_college, False, False),
             ("ananya.sen@apex.edu", "Ananya", "Sen", "STUDENT", apex_college, False, False),
             ("rohan.gupta@apex.edu", "Rohan", "Gupta", "STUDENT", apex_college, False, False),
             ("sneha.patil@apex.edu", "Sneha", "Patil", "STUDENT", apex_college, False, False),
@@ -1335,7 +1331,7 @@ class Command(BaseCommand):
             created_cameras[ccode] = cam
 
         # 3. Biometric Profiles
-        sec_officer = users["security.chief@apex.edu"]
+        principal_officer = users["principal@apex.edu"]
         bio_students = [
             (student_rahul, "e9b4f2c019a778e3451bcdae8902ff31245a7b8c9d0e1f2a3b4c5d6e7f8a9b0c", "ACTIVE"),
             (student_ananya, "7d8a9b0c1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b", "ACTIVE"),
@@ -1348,7 +1344,7 @@ class Command(BaseCommand):
                 student=s_obj,
                 defaults={
                     "status": b_status,
-                    "enrolled_by": sec_officer,
+                    "enrolled_by": principal_officer,
                     "representation_hash": f_hash,
                     "notes": f"Institutional biometric facial template verified during academic onboarding.",
                 }
@@ -1460,11 +1456,11 @@ class Command(BaseCommand):
 
         TrackingAccessLog.objects.get_or_create(
             college=apex_college,
-            user=sec_officer,
+            user=users["hod.cs@apex.edu"],
             student=student_rohan,
             action="SEARCH_LAST_SEEN",
             defaults={
-                "reason": "Campus perimeter gate safety and student entry confirmation.",
+                "reason": "Department HOD security and student exam attendance check.",
                 "ip_address": "192.168.10.5",
             }
         )
@@ -1591,3 +1587,86 @@ class Command(BaseCommand):
         )
 
         self.stdout.write(self.style.SUCCESS("Seeded Phase 9: AI Academic Risk Assessments, Explainable Drivers, and Mentor Reviews."))
+
+        # 10. Facilities & Mentor Bookings
+        seminar_hall, _ = Facility.objects.get_or_create(
+            college=apex_college,
+            name="APEX Central Seminar Hall",
+            defaults={
+                "facility_type": "SEMINAR_HALL",
+                "capacity": 450,
+                "location": "Academic Block A, 3rd Floor",
+                "amenities": "Dolby Surround, Dual 4K Projectors, Stage Lighting, AC",
+                "description": "State-of-the-art auditorium for symposiums, guest keynotes, and academic conferences.",
+                "is_active": True,
+            }
+        )
+
+        sports_turf, _ = Facility.objects.get_or_create(
+            college=apex_college,
+            name="APEX Arena Sports Turf",
+            defaults={
+                "facility_type": "TURF",
+                "capacity": 200,
+                "location": "North Campus Sports Pavilion",
+                "amenities": "Floodlights, All-Weather Synthetic AstroTurf, Player Dugouts",
+                "description": "FIFA-approved multi-sport turf for football, box cricket, and athletic tournaments.",
+                "is_active": True,
+            }
+        )
+
+        # Sample bookings raised by Mentor Anil Verma
+        mentor_user = users.get("mentor.anil@apex.edu")
+        hod_user = users.get("hod.cs@apex.edu")
+        cs_dept = Department.objects.filter(college=apex_college).first()
+
+        if mentor_user and hod_user:
+            FacilityBooking.objects.get_or_create(
+                college=apex_college,
+                facility=seminar_hall,
+                booking_date=timezone.now().date() + timedelta(days=3),
+                start_time=time(10, 0),
+                end_time=time(13, 0),
+                defaults={
+                    "requested_by": mentor_user,
+                    "department": cs_dept,
+                    "purpose": "Inter-Department AI Hackathon & Mentorship Workshop",
+                    "expected_attendees": 120,
+                    "status": "APPROVED",
+                    "reviewed_by": hod_user,
+                    "review_remarks": "Approved. AV team notified to configure projectors and microphones.",
+                    "reviewed_at": timezone.now() - timedelta(days=1),
+                }
+            )
+
+            FacilityBooking.objects.get_or_create(
+                college=apex_college,
+                facility=sports_turf,
+                booking_date=timezone.now().date() + timedelta(days=5),
+                start_time=time(16, 0),
+                end_time=time(19, 0),
+                defaults={
+                    "requested_by": mentor_user,
+                    "department": cs_dept,
+                    "purpose": "CS Dept Annual Box Cricket & Football League",
+                    "expected_attendees": 80,
+                    "status": "PENDING",
+                    "notes": "Floodlights required from 6:00 PM onwards.",
+                }
+            )
+
+        # 11. Library Requests submitted by Mentor
+        sample_book = Book.objects.filter(college=apex_college).first()
+        if mentor_user and sample_book:
+            LibraryRequest.objects.get_or_create(
+                college=apex_college,
+                user=mentor_user,
+                book=sample_book,
+                defaults={
+                    "request_type": "RESERVATION",
+                    "status": "PENDING",
+                    "notes": "Reserved reference copy for semester coursework mentoring sessions.",
+                }
+            )
+
+        self.stdout.write(self.style.SUCCESS("Seeded Facility Bookings (Seminar Hall, Turf) and Mentor Library Requests."))
